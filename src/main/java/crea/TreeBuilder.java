@@ -23,6 +23,9 @@ public class TreeBuilder {
         System.out.println("Using tree file " + treeFile);
     }
 
+    /**
+     * Unserializes the tree from the tree file into a MixedArray and stores it in flatNodes
+     */
     private void initialize() {
         ClassLoader classLoader = getClass().getClassLoader();
         URL resource = classLoader.getResource(treeFile);
@@ -49,26 +52,9 @@ public class TreeBuilder {
 
         String serializedString = sb.toString();
 
-        System.out.println(serializedString);
+        //System.out.println(serializedString);
         flatNodes = Pherialize.unserialize(serializedString).toArray().getArray(0);
-    }
-
-    public ArrayList<String> convertMapToListOfStrings(MixedArray mixedArray) {
-        ArrayList<String> list = new ArrayList<String>();
-        for (Object m : mixedArray.values()) {
-            list.add(m.toString());
-        }
-        return list;
-    }
-
-    public ArrayList<Object> convertMapToList(MixedArray mixedArray) {
-        ArrayList<Object> list = new ArrayList<Object>();
-        for (Object m : mixedArray.values()) {
-            String s = m.toString();
-            Integer i = Integer.parseInt(s);
-            list.add(i);
-        }
-        return list;
+        //System.out.println(flatNodes);
     }
 
     public void buildTree() throws IOException {
@@ -77,10 +63,12 @@ public class TreeBuilder {
         JSONObject tree = new JSONObject();
         MixedArray rootNodeInfo = flatNodes.getArray(0);
 
-        tree.put("names", convertMapToListOfStrings(rootNodeInfo.getArray(0)));
-        tree.put("children", convertMapToList(rootNodeInfo.getArray(2)));
+        tree.put("id", 0);
+        tree.put("names", Utils.convertMapToListOfStrings(rootNodeInfo.getArray(0)));
+        tree.put("children", Utils.convertMapToList(rootNodeInfo.getArray(2)));
 
         // TODO Implement algorithm here
+        DepthFirstAlgorithm.depthFirstConstruction(tree, flatNodes);
 
         FileWriter file = null;
         try {
