@@ -15,6 +15,9 @@ public class TreeBuilder {
     // Properties read from configuration
     private String treeFile;
     private long maxRecursionCalls;
+    private boolean outputStats;
+    private boolean outputTree;
+    private boolean outputIndentedTree;
 
     private HashMap<Integer, Node> flatNodes;
     private int totalNodeTypes;
@@ -24,6 +27,9 @@ public class TreeBuilder {
         resourceReader = new ResourceReader();
         treeFile = resourceReader.getProperty("inputFile");
         maxRecursionCalls = Long.valueOf(resourceReader.getProperty("maxRecursionCalls"));
+        outputStats = Boolean.valueOf(resourceReader.getProperty("outputStats"));
+        outputTree = Boolean.valueOf(resourceReader.getProperty("outputTree"));
+        outputIndentedTree = Boolean.valueOf(resourceReader.getProperty("outputIndentedTree"));
 
         System.out.println("Using tree file " + treeFile);
         System.out.println("Maximum recursion calls: " + maxRecursionCalls);
@@ -49,31 +55,55 @@ public class TreeBuilder {
         try {
             Object obj = parser.parse(serializedString);
             JSONArray jsonArray = (JSONArray) obj;
-            JSONObject unprocessedFlatNodes = (JSONObject) jsonArray.get(0);
-            totalNodeTypes = unprocessedFlatNodes.size();
+
+            Object elemZero = jsonArray.get(0);
+            JSONArray elemZeroAsJsonArray;
+
+            // convert JSONObject with index as key into JSONArray
+            if (elemZero instanceof JSONObject) {
+                JSONObject elemZeroAsJsonObject = (JSONObject) elemZero;
+                elemZeroAsJsonArray = new JSONArray();
+
+                for (int i = 0; i <= elemZeroAsJsonObject.size(); i++) {
+                    elemZeroAsJsonArray.add(i, null);
+                }
+
+                for (Iterator it = elemZeroAsJsonObject.keySet().iterator(); it.hasNext(); ) {
+                    String key = (String) it.next();
+                    if (key != null && !key.equals("")) {
+                        elemZeroAsJsonArray.set(Integer.valueOf(key), elemZeroAsJsonObject.get(key));
+                    }
+                }
+            } else {
+                elemZeroAsJsonArray = (JSONArray) elemZero;
+            }
+
+            totalNodeTypes = elemZeroAsJsonArray.size();
             flatNodes = new HashMap<Integer, Node>(totalNodeTypes);
             encountered = new boolean[totalNodeTypes];
 
-            for (Iterator it = unprocessedFlatNodes.keySet().iterator(); it.hasNext(); ) {
-                String key = (String) it.next();
-                if (key != null && !key.equals("")) {
-                    JSONObject unprocessedNode = (JSONObject) unprocessedFlatNodes.get(key);
+            for (int i = 0; i < totalNodeTypes; i++) {
+                JSONObject unprocessedNode = (JSONObject) elemZeroAsJsonArray.get(i);
 
-                    int nodeId = Integer.valueOf(key);
-                    ArrayList<String> names = Utils.convertJsonArrayToListOfStrings((JSONArray) unprocessedNode.get("0"));
-                    ArrayList<Integer> childIds = Utils.convertJsonArrayToListOfInts((JSONArray) unprocessedNode.get("2"));
-
-                    String[] primNames = names.toArray(new String[names.size()]);
-                    int[] primChildIds = Utils.convertIntegers(childIds);
-
-                    Node node = new Node(primChildIds.length, primNames, primChildIds);
-                    flatNodes.put(nodeId, node);
+                if (unprocessedNode == null) {
+                    System.err.println("Node " + i + " in unprocessedNode is null.");
+                    continue;
                 }
+
+                ArrayList<String> names = Utils.convertJsonArrayToListOfStrings((JSONArray) unprocessedNode.get("0"));
+                ArrayList<Integer> childIds = Utils.convertJsonArrayToListOfInts((JSONArray) unprocessedNode.get("2"));
+
+                String[] primNames = names.toArray(new String[names.size()]);
+                int[] primChildIds = Utils.convertIntegers(childIds);
+
+                Node node = new Node(primChildIds.length, primNames, primChildIds);
+                flatNodes.put(i, node);
             }
 
             for (int i = 0; i < totalNodeTypes; i++) {
                 encountered[i] = false;
             }
+
         } catch (ParseException e) {
             e.printStackTrace();
         }
@@ -81,6 +111,7 @@ public class TreeBuilder {
 
     public void buildTree() throws IOException {
         initialize();
+        JSONObject outputJson = new JSONObject();
         JSONObject tree = new JSONObject();
 
         tree.put("id", 0);
@@ -101,10 +132,20 @@ public class TreeBuilder {
                 else
                     notEncounteredNodes.add(i);
             }
-            tree.put("encountered", encounteredNodes);
-            tree.put("notEncountered", notEncounteredNodes);
-            tree.put("encountered count", encounteredNodes.size());
-            tree.put("notEncountered count", notEncounteredNodes.size());
+
+            if (outputStats) {
+                outputJson.put("total unique nodes", encountered.length);
+                outputJson.put("coverage", ((double) encounteredNodes.size()) / encountered.length * 100);
+                outputJson.put("encountered", encounteredNodes);
+                outputJson.put("notEncountered", notEncounteredNodes);
+                outputJson.put("encountered count", encounteredNodes.size());
+                outputJson.put("notEncountered count", notEncounteredNodes.size());
+            }
+
+            if (outputTree) {
+                outputJson.put("tree", tree);
+            }
+
         } catch (StackOverflowError e) {
             System.out.println(e);
             FileWriter file = null;
@@ -124,12 +165,14 @@ public class TreeBuilder {
         FileWriter indentedFile = null;
         try {
             file = new FileWriter("output.json");
-            file.write(tree.toJSONString());
+            file.write(outputJson.toJSONString());
 
             indentedFile = new FileWriter("output_indented.json");
-            Writer w = new JSonWriter();
-            tree.writeJSONString(w);
-            indentedFile.write(w.toString());
+            if (outputIndentedTree) {
+                Writer w = new JSonWriter();
+                outputJson.writeJSONString(w);
+                indentedFile.write(w.toString());
+            }
 
         } catch (IOException e) {
             e.printStackTrace();
