@@ -1,38 +1,56 @@
 package crea;
-
-import de.ailis.pherialize.MixedArray;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 
 public class DepthFirstAlgorithm {
-    public static JSONObject depthFirstConstruction(JSONObject node, MixedArray flatNodes) {
+    private long maxRecursionCalls = 100;
+    private HashMap<Integer, Node> flatNodes;
+    private boolean[] encountered;
+
+    private int iters = 0;
+
+    public DepthFirstAlgorithm(long maxRecursionCalls, HashMap<Integer, Node> flatNodes, boolean[] encountered) {
+        this.maxRecursionCalls = maxRecursionCalls;
+        this.flatNodes = flatNodes;
+        this.encountered = encountered;
+    }
+
+    public JSONObject depthFirstConstruction(JSONObject node) {
+        iters++;
+        if (iters > maxRecursionCalls)
+            return new JSONObject();
+
         int nodeId = (Integer) node.get("id");
+        encountered[nodeId] = true;
+        System.out.println(nodeId);
 
-        ArrayList<Integer> childrenList =  (ArrayList<Integer>) node.get("children");
-        JSONArray children = new JSONArray();
-        for (Integer child : childrenList) {
-            children.add(child);
-        }
+        int[] childrenList =  (int[]) node.get("children");
 
-        if (children.size() == 0) {
+        if (childrenList.length == 0) {
             return new JSONObject();
         }
 
-        for (int i = 0; i < children.size(); i++) {
-            int childId = (Integer) children.get(i);
+        JSONArray children = new JSONArray();
+
+        for (int i = 0; i < childrenList.length; i++) {
             JSONObject newNode = new JSONObject();
-            MixedArray newNodeInfo = flatNodes.getArray(childId);
-            newNode.put("id", childId);
-            newNode.put("names", Utils.convertMapToListOfStrings(newNodeInfo.getArray(0)));
-            newNode.put("children", Utils.convertMapToList(newNodeInfo.getArray(2)));
+            children.add(newNode);
 
-            children.set(i, newNode);
+            newNode.put("id", childrenList[i]);
+            newNode.put("names", new ArrayList<String>(Arrays.asList(flatNodes.get(nodeId).getNames())));
+            int[] childrenIds = flatNodes.get(nodeId).getChildrenIds();
 
-            JSONObject returnedNode = depthFirstConstruction(newNode, flatNodes);
-            if (!returnedNode.toString().equals("{}")) {
-                children.set(i, returnedNode);
+            if (childrenIds.length != 0) {
+                newNode.put("children", childrenIds);
+
+                JSONObject returnedNode = depthFirstConstruction(newNode);
+                if (!returnedNode.toString().equals("{}")) {
+                    children.set(i, returnedNode);
+                }
             }
         }
         node.put("children", children);
