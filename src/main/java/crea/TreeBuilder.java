@@ -1,46 +1,39 @@
 package crea;
 
-import de.ailis.pherialize.Mixed;
-import de.ailis.pherialize.MixedArray;
-import de.ailis.pherialize.Pherialize;
+import com.tonian.director.dm.json.JSonWriter;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Scanner;
+import java.io.*;
+import java.util.*;
 
 public class TreeBuilder {
+    private ResourceReader resourceReader;
 
+    // Properties read from configuration
     private String treeFile;
-    private MixedArray flatNodes;
+    private long maxRecursionCalls;
 
-    public TreeBuilder(String treeFile) {
-        this.treeFile = treeFile;
+    private HashMap<Integer, Node> flatNodes;
+    private int totalNodeTypes;
+    private boolean[] encountered;
+
+    public TreeBuilder() {
+        resourceReader = new ResourceReader();
+        treeFile = resourceReader.getProperty("inputFile");
+        maxRecursionCalls = Long.valueOf(resourceReader.getProperty("maxRecursionCalls"));
+
         System.out.println("Using tree file " + treeFile);
+        System.out.println("Maximum recursion calls: " + maxRecursionCalls);
     }
 
-    /**
-     * Unserializes the tree from the tree file into a MixedArray and stores it in flatNodes
-     */
     private void initialize() {
-        ClassLoader classLoader = getClass().getClassLoader();
-        URL resource = classLoader.getResource(treeFile);
-        File file = null;
-        if (resource != null) {
-            file = new File(resource.getFile());
-        }
-        else {
-            System.err.println("Resource is not found!");
-            System.exit(1);
-        }
         StringBuilder sb = new StringBuilder("");
 
         try {
-            Scanner scanner = new Scanner(file);
+            Scanner scanner = new Scanner(resourceReader.getResourceFile(treeFile));
             while(scanner.hasNextLine()) {
                 String line = scanner.nextLine();
                 sb.append(line);
@@ -52,33 +45,100 @@ public class TreeBuilder {
 
         String serializedString = sb.toString();
 
-        //System.out.println(serializedString);
-        flatNodes = Pherialize.unserialize(serializedString).toArray().getArray(0);
-        //System.out.println(flatNodes);
+        JSONParser parser = new JSONParser();
+        try {
+            Object obj = parser.parse(serializedString);
+            JSONArray jsonArray = (JSONArray) obj;
+            JSONObject unprocessedFlatNodes = (JSONObject) jsonArray.get(0);
+            totalNodeTypes = unprocessedFlatNodes.size();
+            flatNodes = new HashMap<Integer, Node>(totalNodeTypes);
+            encountered = new boolean[totalNodeTypes];
+
+            for (Iterator it = unprocessedFlatNodes.keySet().iterator(); it.hasNext(); ) {
+                String key = (String) it.next();
+                if (key != null && !key.equals("")) {
+                    JSONObject unprocessedNode = (JSONObject) unprocessedFlatNodes.get(key);
+
+                    int nodeId = Integer.valueOf(key);
+                    ArrayList<String> names = Utils.convertJsonArrayToListOfStrings((JSONArray) unprocessedNode.get("0"));
+                    ArrayList<Integer> childIds = Utils.convertJsonArrayToListOfInts((JSONArray) unprocessedNode.get("2"));
+
+                    String[] primNames = names.toArray(new String[names.size()]);
+                    int[] primChildIds = Utils.convertIntegers(childIds);
+
+                    Node node = new Node(primChildIds.length, primNames, primChildIds);
+                    flatNodes.put(nodeId, node);
+                }
+            }
+
+            for (int i = 0; i < totalNodeTypes; i++) {
+                encountered[i] = false;
+            }
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
     }
 
     public void buildTree() throws IOException {
-        // populate flatNodes
         initialize();
         JSONObject tree = new JSONObject();
-        MixedArray rootNodeInfo = flatNodes.getArray(0);
 
         tree.put("id", 0);
-        tree.put("names", Utils.convertMapToListOfStrings(rootNodeInfo.getArray(0)));
-        tree.put("children", Utils.convertMapToList(rootNodeInfo.getArray(2)));
+        tree.put("names", new ArrayList<String>(Arrays.asList(flatNodes.get(0).getNames())));
+        tree.put("children", flatNodes.get(0).getChildrenIds());
 
-        // TODO Implement algorithm here
-        DepthFirstAlgorithm.depthFirstConstruction(tree, flatNodes);
+        try {
+            DepthFirstAlgorithm algo = new DepthFirstAlgorithm(maxRecursionCalls, flatNodes, encountered);
+            algo.depthFirstConstruction(tree);
+
+            System.out.println("Done running algorithm.");
+
+            ArrayList<Integer> encounteredNodes = new ArrayList<Integer>();
+            ArrayList<Integer> notEncounteredNodes = new ArrayList<Integer>();
+            for (int i = 0; i < encountered.length; i++) {
+                if (encountered[i])
+                    encounteredNodes.add(i);
+                else
+                    notEncounteredNodes.add(i);
+            }
+            tree.put("encountered", encounteredNodes);
+            tree.put("notEncountered", notEncounteredNodes);
+            tree.put("encountered count", encounteredNodes.size());
+            tree.put("notEncountered count", notEncounteredNodes.size());
+        } catch (StackOverflowError e) {
+            System.out.println(e);
+            FileWriter file = null;
+            try {
+                file = new FileWriter("output.json");
+                file.write(tree.toJSONString());
+            } catch (IOException e2) {
+                e2.printStackTrace();
+            } finally {
+                file.flush();
+                file.close();
+            }
+        }
+
 
         FileWriter file = null;
+        FileWriter indentedFile = null;
         try {
             file = new FileWriter("output.json");
             file.write(tree.toJSONString());
+
+            indentedFile = new FileWriter("output_indented.json");
+            Writer w = new JSonWriter();
+            tree.writeJSONString(w);
+            indentedFile.write(w.toString());
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
             file.flush();
             file.close();
+
+            indentedFile.flush();
+            indentedFile.close();
         }
 
         System.out.println("Finished building tree");
