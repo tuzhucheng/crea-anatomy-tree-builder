@@ -19,23 +19,24 @@ public class DepthFirstAlgorithm {
         this.encountered = encountered;
     }
 
-    public JSONObject depthFirstConstruction(JSONObject node) {
+    public void depthFirstConstruction(JSONObject node) {
         iters++;
         if (iters > maxRecursionCalls)
-            return null;
+            return;
 
         int nodeId = (Integer) node.get("id");
         encountered[nodeId] = true;
         System.out.println(nodeId);
-
         int[] childrenList =  (int[]) node.get("children");
 
+        // Base Case
         if (childrenList.length == 0) {
-            System.err.println("childrenList length should not be 0!");
-            return null;
+            node.put("children", new ArrayList<Integer>(0));
+            return;
         }
 
         JSONArray children = new JSONArray();
+        node.put("children", children);
 
         for (int i = 0; i < childrenList.length; i++) {
             JSONObject newNode = new JSONObject();
@@ -44,22 +45,11 @@ public class DepthFirstAlgorithm {
             newNode.put("id", childrenList[i]);
             newNode.put("names", new ArrayList<String>(Arrays.asList(flatNodes.get(childrenList[i]).getNames())));
             int[] childrenIds = flatNodes.get(childrenList[i]).getChildrenIds();
+            newNode.put("children", childrenIds);
 
-            if (childrenIds.length != 0) {
-                newNode.put("children", childrenIds);
-
-                JSONObject returnedNode = depthFirstConstruction(newNode);
-                if (returnedNode != null) {
-                    children.set(i, returnedNode);
-                }
-            } else {
-                encountered[childrenList[i]] = true;
-            }
+            depthFirstConstruction(newNode);
         }
 
-        // replace the list of children IDs with nested children objects
-        node.put("children", children);
-
-        return node;
+        return;
     }
 }

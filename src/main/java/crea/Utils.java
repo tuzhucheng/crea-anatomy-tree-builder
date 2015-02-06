@@ -70,4 +70,12 @@ public class Utils {
         return ret;
     }
 
+    public static ArrayList<Integer> convertIntArrayToArrayList(int[] intArray) {
+        ArrayList<Integer> list = new ArrayList<Integer>(intArray.length);
+        for (int i = 0; i < intArray.length; i++) {
+            list.add(intArray[i]);
+        }
+        return list;
+    }
+
 }
