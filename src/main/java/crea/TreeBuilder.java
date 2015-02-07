@@ -22,6 +22,7 @@ public class TreeBuilder {
     private HashMap<Integer, Node> flatNodes;
     private int totalNodeTypes;
     private boolean[] encountered;
+    private int[] hits;
 
     public TreeBuilder() {
         resourceReader = new ResourceReader();
@@ -81,6 +82,7 @@ public class TreeBuilder {
             totalNodeTypes = elemZeroAsJsonArray.size();
             flatNodes = new HashMap<Integer, Node>(totalNodeTypes);
             encountered = new boolean[totalNodeTypes];
+            hits = new int[totalNodeTypes];
 
             for (int i = 0; i < totalNodeTypes; i++) {
                 JSONObject unprocessedNode = (JSONObject) elemZeroAsJsonArray.get(i);
@@ -102,6 +104,7 @@ public class TreeBuilder {
 
             for (int i = 0; i < totalNodeTypes; i++) {
                 encountered[i] = false;
+                hits[i] = 0;
             }
 
         } catch (ParseException e) {
@@ -113,17 +116,19 @@ public class TreeBuilder {
         initialize();
         JSONObject outputJson = new JSONObject();
         JSONObject tree = new JSONObject();
+        JSONObject hitStats = new JSONObject();
 
         tree.put("id", 0);
         tree.put("names", new ArrayList<String>(Arrays.asList(flatNodes.get(0).getNames())));
         tree.put("children", flatNodes.get(0).getChildrenIds());
 
         try {
-            DepthFirstAlgorithm algo = new DepthFirstAlgorithm(maxRecursionCalls, flatNodes, encountered);
+            DepthFirstAlgorithm algo = new DepthFirstAlgorithm(tree, maxRecursionCalls, flatNodes, encountered, hits);
             algo.depthFirstConstruction(tree);
 
             System.out.println("Done running algorithm.");
 
+            // encountered vs unencountered nodes stats and hit stats
             ArrayList<Integer> encounteredNodes = new ArrayList<Integer>();
             ArrayList<Integer> notEncounteredNodes = new ArrayList<Integer>();
             for (int i = 0; i < encountered.length; i++) {
@@ -131,6 +136,8 @@ public class TreeBuilder {
                     encounteredNodes.add(i);
                 else
                     notEncounteredNodes.add(i);
+
+                hitStats.put(i, hits[i]);
             }
 
             if (outputStats) {
@@ -140,6 +147,7 @@ public class TreeBuilder {
                 outputJson.put("notEncountered", notEncounteredNodes);
                 outputJson.put("encountered count", encounteredNodes.size());
                 outputJson.put("notEncountered count", notEncounteredNodes.size());
+                outputJson.put("hits", hitStats);
             }
 
             if (outputTree) {

@@ -7,26 +7,27 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 public class DepthFirstAlgorithm {
+    JSONObject tree;
     private long maxRecursionCalls = 100;
     private HashMap<Integer, Node> flatNodes;
     private boolean[] encountered;
+    private int[] hits;
 
     private int iters = 0;
 
-    public DepthFirstAlgorithm(long maxRecursionCalls, HashMap<Integer, Node> flatNodes, boolean[] encountered) {
+    public DepthFirstAlgorithm(JSONObject tree, long maxRecursionCalls, HashMap<Integer, Node> flatNodes, boolean[] encountered, int[] hits) {
         this.maxRecursionCalls = maxRecursionCalls;
         this.flatNodes = flatNodes;
         this.encountered = encountered;
+        this.hits = hits;
+        this.tree = tree;
     }
 
     public void depthFirstConstruction(JSONObject node) {
-        iters++;
-        if (iters > maxRecursionCalls)
-            return;
-
         int nodeId = (Integer) node.get("id");
         encountered[nodeId] = true;
-        System.out.println(nodeId);
+        hits[nodeId]++;
+        // System.out.println(nodeId);
         int[] childrenList =  (int[]) node.get("children");
 
         // Base Case
@@ -34,6 +35,11 @@ public class DepthFirstAlgorithm {
             node.put("children", new ArrayList<Integer>(0));
             return;
         }
+
+        // Bound recursion
+        iters++;
+        if (iters > maxRecursionCalls)
+            return;
 
         JSONArray children = new JSONArray();
         node.put("children", children);
