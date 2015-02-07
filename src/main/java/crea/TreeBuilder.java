@@ -14,6 +14,7 @@ public class TreeBuilder {
 
     // Properties read from configuration
     private String treeFile;
+    private boolean boundRecursion;
     private long maxRecursionCalls;
     private boolean outputStats;
     private boolean outputTree;
@@ -23,11 +24,14 @@ public class TreeBuilder {
     private int totalNodeTypes;
     private boolean[] encountered;
     private int[] hits;
+    private ArrayList<HashSet<Integer>> ancestors;
 
     public TreeBuilder() {
         resourceReader = new ResourceReader();
         treeFile = resourceReader.getProperty("inputFile");
-        maxRecursionCalls = Long.valueOf(resourceReader.getProperty("maxRecursionCalls"));
+        boundRecursion = Boolean.valueOf(resourceReader.getProperty("boundRecursion"));
+        if (boundRecursion)
+            maxRecursionCalls = Long.valueOf(resourceReader.getProperty("maxRecursionCalls"));
         outputStats = Boolean.valueOf(resourceReader.getProperty("outputStats"));
         outputTree = Boolean.valueOf(resourceReader.getProperty("outputTree"));
         outputIndentedTree = Boolean.valueOf(resourceReader.getProperty("outputIndentedTree"));
@@ -83,6 +87,7 @@ public class TreeBuilder {
             flatNodes = new HashMap<Integer, Node>(totalNodeTypes);
             encountered = new boolean[totalNodeTypes];
             hits = new int[totalNodeTypes];
+            ancestors = new ArrayList<HashSet<Integer>>(totalNodeTypes);
 
             for (int i = 0; i < totalNodeTypes; i++) {
                 JSONObject unprocessedNode = (JSONObject) elemZeroAsJsonArray.get(i);
@@ -105,6 +110,7 @@ public class TreeBuilder {
             for (int i = 0; i < totalNodeTypes; i++) {
                 encountered[i] = false;
                 hits[i] = 0;
+                ancestors.add(new HashSet<Integer>());
             }
 
         } catch (ParseException e) {
@@ -123,7 +129,7 @@ public class TreeBuilder {
         tree.put("children", flatNodes.get(0).getChildrenIds());
 
         try {
-            DepthFirstAlgorithm algo = new DepthFirstAlgorithm(tree, maxRecursionCalls, flatNodes, encountered, hits);
+            DepthFirstAlgorithm algo = new DepthFirstAlgorithm(tree, boundRecursion, maxRecursionCalls, flatNodes, encountered, hits, ancestors);
             algo.depthFirstConstruction(tree);
 
             System.out.println("Done running algorithm.");
